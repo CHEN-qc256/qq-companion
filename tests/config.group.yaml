@@ -1,0 +1,90 @@
+# 群聊端到端测试专用配置。
+#   python main.py --config tests/config.group.yaml
+#   python tools/mock_napcat.py --group 30003 --script tests/chat_group.txt
+#
+# 端口特意用 3011，避开正在跑的那份 companion（3001）。
+
+onebot:
+  mode: "reverse"
+  host: "0.0.0.0"
+  port: 3011
+  path: "/onebot/v11/ws"
+
+llm:
+  api_key: ""
+  model: "deepseek-flash"
+  thinking: false
+  max_tokens: 200
+  mock: true
+
+context:
+  history_tokens: 1500
+
+budget:
+  daily_yuan: 2.0
+  min_interval_seconds: 0
+
+humanize:
+  read_delay_min: 0.2
+  read_delay_max: 0.4
+  typing_per_char_min: 0.03
+  typing_per_char_max: 0.06
+  typing_min: 0.3
+  typing_max: 2.0
+  segment_gap_min: 0.3
+  segment_gap_max: 0.5
+  segment_max_len: 20          # 故意设小，用来验证「群里只发 1 条」
+  debounce_seconds: 0.8
+  late_reply_chance: 0
+  trivial_replies:
+    - ['^(在|在吗|在不在|在么)[？?！!。.]*$', "在"]
+
+life:
+  enabled: false
+  proactive:
+    enabled: false
+
+memory:
+  enabled: true
+  extract_every_turns: 4
+  extract_min_turns: 3
+  top_k: 3
+  min_sim: 0.2
+
+persona:
+  file: "persona/default.md"
+  name: "遥遥"
+  group_file: "persona/group.md"
+
+whitelist:
+  private: []
+  groups: [30003]              # 只在这个群活动
+  group_reply_rate: 0.0
+  auto_accept_first: 1
+
+# 冷却归零，否则连续几条测试消息会被限流挡住，看不全链路。
+# 限流本身由 tests/test_group.py 的 D 组专门验证。
+group:
+  enabled: true
+  address_required: true
+  per_user_cooldown_seconds: 0.0
+  reply_cooldown_seconds: 0.0
+  max_replies_per_hour: 100
+  history_tokens: 900
+  max_segments: 1
+
+database:
+  path: "data/group_e2e.db"
+logging:
+  level: "INFO"
+  file: "data/group_e2e.log"
+
+pricing:
+  currency_per_million:
+    deepseek-flash:
+      cache_hit:  { peak: 0.04, offpeak: 0.02 }
+      cache_miss: { peak: 2.0,  offpeak: 1.0 }
+      output:     { peak: 8.0,  offpeak: 4.0 }
+  peak_weekdays: [0, 1, 2, 3, 4]
+  peak_ranges: [[9, 12], [14, 18]]
+  holidays: []

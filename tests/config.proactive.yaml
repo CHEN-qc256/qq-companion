@@ -1,0 +1,79 @@
+# 只用来离线验证 P2「主动搭话」的配置：把静默门槛和轮询间隔压到最小。
+#   python main.py --config tests/config.proactive.yaml
+#   python tools/mock_napcat.py --script tests/chat_script2.txt --gap 1 --wait 20
+#
+# 玩法：第一次跑先聊两句（攒出长期记忆当由头），停掉；再启动一次，
+# 后台第一轮 tick 就会立刻主动找你说话。
+
+llm:
+  api_key: ""
+  model: "deepseek-flash"
+  thinking: false
+  max_tokens: 200
+  mock: true
+
+budget:
+  daily_yuan: 2.0
+  min_interval_seconds: 0
+
+humanize:
+  read_delay_min: 0.2
+  read_delay_max: 0.4
+  typing_per_char_min: 0.02
+  typing_per_char_max: 0.04
+  typing_min: 0.2
+  typing_max: 1.0
+  segment_gap_min: 0.2
+  segment_gap_max: 0.4
+  debounce_seconds: 0.5
+  late_reply_chance: 0
+  trivial_replies: []
+
+life:
+  enabled: true
+  sleeping: []                  # 不睡，随时可搭话
+  working: []
+  weekday_only_work: false
+  moods:
+    winding_down: "晚上在家瘫着，懒得动"
+    free: "闲着，有空聊天"
+  proactive:
+    enabled: true
+    min_idle_hours: 0.0         # 测试用：刚聊完也算"静默够久"
+    max_per_day: 2
+    active_hours: [0, 24]       # 全天可搭话
+    check_interval_minutes: 1.0 # 循环间隔下限是 60s；启动时第一轮 tick 立刻跑
+    topics_from_memory: 3
+
+memory:
+  enabled: true
+  extract_every_turns: 2
+  extract_min_turns: 2
+  top_k: 3
+  min_sim: 0.2
+
+persona:
+  file: "persona/default.md"
+  name: "遥遥"
+
+whitelist:
+  private: []
+  groups: []
+  group_reply_rate: 0.0
+  auto_accept_first: 1
+
+database:
+  path: "data/proactive.db"
+logging:
+  level: "INFO"
+  file: "data/proactive.log"
+
+pricing:
+  currency_per_million:
+    deepseek-flash:
+      cache_hit:  { peak: 0.04, offpeak: 0.02 }
+      cache_miss: { peak: 2.0,  offpeak: 1.0 }
+      output:     { peak: 8.0,  offpeak: 4.0 }
+  peak_weekdays: [0, 1, 2, 3, 4]
+  peak_ranges: [[9, 12], [14, 18]]
+  holidays: []

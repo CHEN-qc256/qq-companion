@@ -1,0 +1,244 @@
+# qq-companion 配置
+# 复制成 config.yaml 再改：copy config.example.yaml config.yaml
+#
+# 带 ★ 的项直接决定花多少钱，改之前先看注释。
+
+llm:
+  api_key: ""                       # 留空则读环境变量 DEEPSEEK_API_KEY
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-flash"           # flash 便宜 6 倍；要更强换 deepseek-v4-pro
+  thinking: false                   # ★ 头号省钱开关。见下方说明
+  max_tokens: 200                   # ★ 输出按 4~8 元/M 计费，陪聊 200 足够
+  temperature: 1.3                  # 只在 thinking=false 时有效
+  timeout: 60.0
+  mock: false                       # true = 不联网，用假回复跑通流程
+  # ★ 联网搜索（P5）：把 web_search / fetch_page 当工具交给模型，由它自己决定用不用。
+  #   工具定义挂在缓存前缀上，平时一次都不调 ≈ 不花钱；真搜一次约 0.001~0.003 元。
+  web_search: true
+  max_tool_rounds: 2                # 一轮回复最多来回调几次工具。2 够用，调大只变慢变贵
+
+# ★ 关于 thinking：
+#   思考模式默认是开的，思维链算「输出」token（4~8 元/M）。
+#   陪聊场景每轮白烧几百 token，开一天就是十几块。
+#   关掉：thinking: false。这一行大概能省掉一半以上的钱，且对闲聊质量几乎无影响。
+
+# ── 怎么和 NapCat 说话 ────────────────────────────────────────────────
+# reverse = 程序监听端口，NapCat 连过来（推荐，NapCat 重启不会把程序带断）
+# forward = 程序主动连 NapCat 的 WS 服务器（NapCat 必须先开着）
+onebot:
+  mode: "reverse"
+  host: "0.0.0.0"
+  port: 3001
+  path: "/onebot/v11/ws"
+  url: "ws://127.0.0.1:3000"        # 只有 mode: forward 时才用
+  access_token: ""                  # 和 NapCat 网络配置里填的 token 保持一致；不填就都留空
+
+budget:
+  daily_yuan: 2.0                   # 日预算，超了自动转「省电模式」
+  monthly_yuan: 45.0
+  min_interval_seconds: 1.0         # 两条回复之间的最小间隔，防连续刷屏触发风控
+  saver_history_tokens: 600         # 省电模式下的上下文预算
+  saver_max_tokens: 80              # 省电模式下的回复长度上限
+  hard_stop_multiplier: 3.0         # 花到 daily_yuan 的 3 倍就硬停，需要人工改配置
+
+context:
+  history_tokens: 1500              # ★ 历史累积超过这个就压成摘要（不是丢弃！见 context.py）
+  compress_ratio: 0.6               # 每次压缩吃掉最老的那 60%
+  summary_tokens: 300               # 摘要 + 画像输出上限
+  profile_tokens: 200
+
+humanize:
+  read_delay_min: 0.4               # 假装先看到消息
+  read_delay_max: 1.8
+  typing_per_char_min: 0.09         # 打字速度：每字秒数
+  typing_per_char_max: 0.22
+  typing_min: 1.2                   # 打字时长上下限
+  typing_max: 12.0
+  segment_gap_min: 0.6              # 分条发送的间隔
+  segment_gap_max: 2.2
+  segment_max_len: 60               # 超过这个长度就拆成两条
+  segment_max_count: 3              # 最多拆几条，多了合并（防刷屏）
+  debounce_seconds: 1.2             # ★ 他连发三条，等 1.2 秒合并成一次回复
+  late_reply_chance: 0.08           # 8% 概率晚点回，更像真人
+  late_reply_min: 60.0
+  late_reply_max: 1500.0
+
+  # 本地规则回复：命中就完全不调模型，0 token。
+  # 这是最便宜的优化，但别加太多，否则会显得很机械。
+  trivial_replies:
+    - ['^(在|在吗|在不在|在么)[？?！!。.]*$', "在"]
+    - ['^(嗯|恩|哦|噢|好吧|行吧)[。.！!]*$', "嗯"]
+    - ['^(晚安|睡了|睡觉了|困了)[。.！!]*$', "晚安"]
+    - ['^(哈哈|哈哈哈|hhhh)+[。.！!]*$', "笑死"]
+
+# ── 作息（P4）────────────────────────────────────────────────────────
+# 真人不 24 小时待命。作息决定「现在该不该回、回多长、什么语气」。
+# 睡着了不会丢消息，会挂成任务等他醒了再回（app/orchestrator.py 的 _deferred_reply）。
+life:
+  enabled: true
+  sleeping: [1, 8]                  # 凌晨 1 点到早 8 点是睡着（支持跨零点，如 [23, 8]）
+  working: [[9, 12], [14, 18]]      # 这段时间回得短、有点敷衍
+  weekday_only_work: true           # 周末不上班
+  moods:                            # 这个心情会进当轮动态块（不破坏缓存），影响说话语气
+    sleeping: "刚睡醒，还在迷糊"
+    working: "在上班，偷偷摸鱼回消息"
+    winding_down: "晚上在家瘫着，懒得动"
+    free: "闲着，有空聊天"
+
+  # 主动搭话（P2）：他不说话时，偶尔主动找他一次。
+  proactive:
+    enabled: true
+    min_idle_hours: 6.0             # 至少安静这么久才可能开口
+    max_per_day: 2                  # ★ 每天最多主动几次。调高会很像推销号
+    active_hours: [10, 23]          # 只在 10 点到 23 点之间主动
+    check_interval_minutes: 15.0    # 多久看一次要不要开口
+    topics_from_memory: 3           # 从长期记忆里挑几个旧事当由头
+    targets: []                     # 只主动搭话给这几个 QQ；留空 = 只看下面的 masters
+    min_hours_between: 2.0          # ★ 同一个人两次主动之间至少隔这么久，别再刷屏
+
+# ── 长期记忆（P3）────────────────────────────────────────────────────
+# 全部本地跑：分词 + IDF + 时间衰减，0 token、0 延迟、不多装任何库。
+# recall 的相似度是「他这句话的信息量，有百分之多少被这条记忆接住了」。
+memory:
+  enabled: true
+  extract_every_turns: 20           # 每聊 20 轮抽一次事实（要调模型，是这里唯一的开销）
+  extract_min_turns: 6              # 第一次抽取至少要有 6 轮对话
+  extract_max_facts: 4              # 一次最多记几条
+  extract_max_tokens: 220           # 抽取输出上限
+  top_k: 3                          # 每轮最多注入几条旧记忆
+  max_chars: 30                     # 每条注入时截断到多少字
+  min_sim: 0.45                     # ★ 只卡「像不像」，不卡新旧。调高 = 更少但更准
+  half_life_days: 30.0              # 时间衰减半衰期，只影响排序，不影响要不要想起
+  dedup_threshold: 0.72             # 多像算同一条，走合并而不是新增
+
+persona:
+  file: "persona/default.md"        # 私聊人设
+  name: "遥遥"                      # 群里被叫到这个名字会回复
+  group_file: "persona/group.md"    # 群聊人设（分开写 —— 群里要更收敛）。文件不存在就退回上面那套
+  group_name: ""                    # 群里被叫到哪个名字才回。留空 = 用 name
+
+whitelist:
+  # 开箱即用：这两个列表留空就行。
+  # 第一个私聊这个 QQ 小号的人（也就是你拿自己主号发的那条「在吗」）会被自动认成主人，
+  # 写进本地数据库，以后只有你和小号说话，别人来消息一律不理。
+  private: []                       # 想额外指定就让 setup.py 帮你填，或手写 [123456]
+  groups: []                        # ★ 群白名单。空 = 任何群都理（第一次收到某个群的消息会打日志告诉你群号）
+  group_reply_rate: 0.0             # ★ 群里没 @ 到时的随机插话概率。0 = 不插话，只在被叫到时回
+  auto_accept_first: 1              # 前 N 个私聊你的人自动进白名单；设 0 = 关掉（开放模式，谁都能聊）
+  # ★ 谁是「主人」——和上面的 private（谁能跟它说话）是两件不同的事。
+  #   留空 = 老行为：能私聊它的就一律当主人（单人自用最省事）。
+  #   一旦填了（比如 [你的QQ]），不在名单里的私聊对象会被当成「主人允许来聊天的朋友」：
+  #   照常聊天，但不会被叫老大、不会被当成主人本人，也不会把你的私事讲给他听。
+  masters: []
+
+# ── 群聊（P5）────────────────────────────────────────────────────────
+# 群里默认"被 @ 或被叫名字才说话"，而且有三层限流。
+# 想更热闹：把 group_reply_rate 调到 0.05~0.1，address_required 设 false。
+# 但先说清楚 —— 在活跃群里随机插话是**会被踢和举报的**，调之前想好。
+group:
+  enabled: true                     # 关掉 = 完全不理群消息
+  address_required: true            # ★ true = 只理 @ 和叫名字的；false = 按上面的概率随机插话
+  per_user_cooldown_seconds: 20.0   # 同一个人在群里连 @ 你，两次回复至少隔这么久
+  reply_cooldown_seconds: 8.0       # ★ 整个群两次回复至少隔这么久，防刷屏
+  max_replies_per_hour: 30          # 硬上限：这个群每小时最多回几条
+  history_tokens: 900               # 群聊上下文预算，比私聊紧（人多、话题散，记多了又贵又串味）
+  max_segments: 1                   # 群里一次最多发几条。默认 1 —— 连发三条在小群里很扎眼
+
+database:
+  path: "data/companion.db"         # 聊天记录只存本地，不外传
+
+# 本地语音（GPT-SoVITS）。本包已内置调教好的 6 个音色，默认开启。
+# 音色、试听、克隆都在面板「声音」页签里做，这里只填接入参数。
+# 语音服务没起来也不会卡住 —— 会自动降级成文字发出去。
+tts:
+  enabled: true                     # ★ 默认就发语音。不想要就改成 false
+  always_voice: false               # 全语音模式：每条回复都发（覆盖 trigger/chance，关了即回原设置）
+  api_base: "http://127.0.0.1:9880" # api_v2.py 的地址，只绑本机
+  # 语音运行时目录（含 refs\ 和 app\）。
+  # 发布包里它就在项目隔壁，所以这里写相对路径，整个文件夹挪位置也不会失效。
+  # 相对路径按「项目根目录」算；也接受 D:/GPT-SoVITS-deploy 这种绝对路径。
+  install_dir: "../GPT-SoVITS-deploy"
+  max_chars: 120                    # 一条语音最多念多少字，再长没人听完
+  timeout: 60.0                     # 合成超时（秒）。冷启动第一句要 7~8 秒
+  speed: 1.0                        # 语速。0.9 温柔，1.1 活泼，>1.3 音质劣化
+  # 默认音色。refs\ 里内置 6 个：胡桃 / 申鹤 / 芙宁娜 / 荧 / 迪卢克 / 那维莱特。
+  # 填的名字必须和 refs\ 里的 wav 同名；找不到就回退 default.wav。
+  default_emotion: "胡桃"
+  trigger: "auto"                   # request=只在被要求时发 / auto=按概率主动发
+  chance: 0.25                      # auto 模式下每条回复转语音的概率
+  group: false                      # 群里是否也主动发语音（被点名要时不受限制）
+
+# 开机自启：登录 Windows 后自动拉起，全程不弹黑框。
+# 真正生效的是注册表 HKCU\Software\Microsoft\Windows\CurrentVersion\Run\qq-companion，
+# 这里的 enabled 只是同一件事的记录 —— 在面板顶栏点一下会同时改两处。
+boot:
+  enabled: false                    # 打开后每次登录自动启动（命令见 `python boot.py --status`）
+  delay: 10                         # 登录后等几秒再拉，等网络/桌面就位
+  napcat: true                      # 代管 NapCat（自动找目录 + 静默拉起）
+  napcat_path: ""                   # 手动指定 NapCat 的 .bat/.exe；留空则自动找
+  napcat_qq: ""                     # 快速登录的 QQ 号；留空从 start-napcat.bat 里读
+  bilinote: true                    # 顺带拉起 BiliNote 后端（视频推送生成笔记用）
+  tts: true                         # 顺带拉起 GPT-SoVITS（加载约 1 分钟；没装也会自动降级成文字）
+  panel: true                       # 顺带把管理面板挂到 127.0.0.1:8899
+  open_panel: true                  # 面板起来后自动打开浏览器（隐藏模式下唯一看得见的东西）
+  headless: true                    # 隐藏所有子进程窗口（排查时可关）
+
+logging:
+  level: "INFO"
+  file: "data/companion.log"
+
+# 计价表（元 / 百万 token）。高峰 = 北京时间周一至周五 9-12 点、14-18 点，
+# 其余时间（含周末、法定节假日）走空闲价，正好一半。
+# 加了中国法定节假日到 holidays 里能再省一点。
+pricing:
+  currency_per_million:
+    deepseek-flash:
+      cache_hit:  { peak: 0.04, offpeak: 0.02 }
+      cache_miss: { peak: 2.0,  offpeak: 1.0 }
+      output:     { peak: 8.0,  offpeak: 4.0 }
+    deepseek-v4-pro:
+      cache_hit:  { peak: 0.30, offpeak: 0.15 }
+      cache_miss: { peak: 9.0,  offpeak: 4.5 }
+      output:     { peak: 27.0, offpeak: 13.5 }
+  peak_weekdays: [0, 1, 2, 3, 4]    # 0 = 周一
+  peak_ranges: [[9, 12], [14, 18]]
+  # 节假日按年作废，用 `python tools/holidays.py --write` 拉当年的日历自动填。
+  holidays: []
+
+# B 站视频推送：按关键词去 B 站搜视频 → AI 用思考模式筛掉垃圾 → BiliNote 生成笔记 → QQ 推送。
+# 关键词写成「关键词|筛选要求」，竖线后面会原样写进提示词。面板的「B 站视频推送」组里改更省事。
+# 开关也能用对话指令改：私聊/群里发「视频推送 开」「视频推送 关」「视频推送 状态」
+# 「视频推送 现在就推」（只有主人能改；群里发「开」会把这个群加进 groups）。
+videopush:
+  enabled: true
+  topics: []                        # 例：["AI Agent|只看工程实践，不要卖课", "算法竞赛|ACM/蓝桥杯 题解，C++ 为主"]
+  times: ["09:00", "21:00"]         # 每天几点各跑一轮（24 小时制）
+  targets: []                       # 收推送的 QQ 号；留空 = whitelist.masters
+  groups: []                        # 也收推送的群号；群里发「视频推送 开」会自己加进来
+  max_per_day: 3                    # 一天最多推几条（含补跑）
+  max_per_topic: 2                  # 一个关键词一轮最多选几条
+  candidates: 24                    # 每个关键词最多收多少条给 AI（会翻「综合」两页 + 「最新」一页合并去重）
+  min_score: 70                     # AI 评分门槛，低于就不要
+  max_age_days: 30                  # 只要最近 N 天发布的；0 = 不限
+  min_duration: 120                 # 最短时长（秒）
+  max_duration: 5400                # 最长时长（秒），挡掉几百分钟的合集
+  min_play: 300                     # 播放量下限；0 = 不过滤（发布不满 3 天的新视频不看这项）
+  block_words: ["广告", "带货", "招生", "训练营", "抽奖", "福利", "加群", "领资料"]
+  thinking: true                    # ★ 筛选用思考模式（high），比聊天那条路贵但一天只跑两三次
+  filter_effort: "high"             # 思考档位：low / high / max
+  filter_max_tokens: 3000
+  catchup_hours: 12                 # 错过时间点后多少小时内补跑
+  check_interval: 60                # 调度检查间隔（秒）
+  note_style: "detailed"            # BiliNote 笔记风格
+  note_quality: "fast"              # fast / medium / slow
+  note_screenshot: false
+  note_timeout: 900                 # 单条笔记最多等多少秒
+  note_max_chars: 1200              # 推送里最多带多少字笔记
+  bilinote_url: "http://127.0.0.1:8483"
+  bilinote_dir: "D:/BiliNote/backend"
+  bilinote_python: ""               # 默认 <backend>/.venv/Scripts/python.exe
+  bilinote_autostart: true          # 没起就无窗口拉起来
+  provider_id: ""                   # 留空 = 问 BiliNote 当前启用的供应商
+  model_name: ""                    # 留空 = 该供应商的第一个模型
+  cookie: ""                        # 可选：SESSDATA=...; bili_jct=...（被风控时才需要）
+

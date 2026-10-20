@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qq-companion 管理面板</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🤖</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🤖</span>
+    <div>
+      <h1>qq-companion</h1>
+      <div class="sub" id="cfgPath">—</div>
+    </div>
+  </div>
+
+  <div class="statusWrap">
+    <span class="pill" id="runPill"><i class="dot"></i><span id="runText">读取中…</span></span>
+    <span class="pill ghost" id="statPill" hidden></span>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="btnStart">启动</button>
+    <button class="btn" id="btnStop">停止</button>
+    <button class="btn" id="btnRestart">重启</button>
+    <button class="btn" id="btnBoot" title="登录 Windows 后自动启动机器人（隐藏窗口）">开机自启：关</button>
+    <button class="btn" id="btnVideopush" title="不用等到点，立刻搜一轮 B 站视频并推送">推送一次</button>
+    <button class="btn icon" id="btnTheme" title="切换深色模式">🌙</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="config">配置参数</button>
+  <button class="tab" data-tab="logs">实时日志</button>
+  <button class="tab" data-tab="stats">花费与记忆</button>
+  <button class="tab" data-tab="voice">声音</button>
+  <div class="tabSpacer"></div>
+  <div class="saveArea">
+    <span class="dirty" id="dirtyFlag" hidden>有未保存的改动</span>
+    <button class="btn" id="btnReset" title="把所有参数恢复成默认值（不会自动保存）">重置默认</button>
+    <button class="btn" id="btnImport">导入</button>
+    <button class="btn" id="btnExport">导出</button>
+    <button class="btn primary" id="btnSave">保存</button>
+  </div>
+</nav>
+
+<main>
+
+<!-- ══════════════ 配置 ══════════════ -->
+<section class="panel active" id="tab-config">
+  <div class="toolbar">
+    <input type="search" id="search" placeholder="搜索参数名 / 说明 / 键名…">
+    <label class="chk"><input type="checkbox" id="showAdvanced"> 显示高级参数</label>
+    <button class="btn small" id="btnExpandAll">全部展开</button>
+    <button class="btn small" id="btnCollapseAll">全部折叠</button>
+    <div class="toolbarSpacer"></div>
+    <span class="muted" id="paramCount"></span>
+  </div>
+
+  <div id="issueBar" class="issueBar" hidden></div>
+  <div id="groups"></div>
+</section>
+
+<!-- ══════════════ 日志 ══════════════ -->
+<section class="panel" id="tab-logs">
+  <div class="toolbar">
+    <button class="btn primary small" id="btnLogToggle">暂停</button>
+    <label class="chk"><input type="checkbox" id="logFollow" checked> 自动滚动</label>
+    <input type="search" id="logFilter" placeholder="关键词过滤（支持正则，如 回复|想起）">
+    <label class="chk">刷新间隔
+      <select id="logInterval">
+        <option value="1000">1 秒</option>
+        <option value="2000" selected>2 秒</option>
+        <option value="5000">5 秒</option>
+        <option value="0">不自动刷新</option>
+      </select>
+    </label>
+    <div class="toolbarSpacer"></div>
+    <span class="muted" id="logMeta"></span>
+    <button class="btn small" id="btnLogClear">清空</button>
+  </div>
+  <pre id="logBox" class="logBox"></pre>
+</section>
+
+<!-- ══════════════ 花费与记忆 ══════════════ -->
+<section class="panel" id="tab-stats">
+  <div class="cards" id="statCards"></div>
+  <div class="twoCol">
+    <div class="card">
+      <h3>最近 7 天花费</h3>
+      <div class="bars" id="dailyBars"></div>
+    </div>
+    <div class="card">
+      <h3>今天按用途分（看钱花在哪）</h3>
+      <table class="tbl" id="purposeTbl"><tbody><tr><td class="muted">—</td></tr></tbody></table>
+    </div>
+  </div>
+  <div class="twoCol">
+    <div class="card">
+      <h3>长期记忆 <span class="muted" id="factCount"></span></h3>
+      <ul class="list" id="factList"></ul>
+    </div>
+    <div>
+      <div class="card">
+        <h3>已绑定的人</h3>
+        <ul class="list" id="allowList"></ul>
+      </div>
+      <div class="card">
+        <h3>最近的消息</h3>
+        <ul class="list" id="msgList"></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ 声音（GPT-SoVITS） ══════════════ -->
+<section class="panel" id="tab-voice">
+  <div class="toolbar">
+    <span class="pill ghost" id="vPill"><i class="dot"></i><span id="vPillText">检测中…</span></span>
+    <span class="muted" id="vMeta"></span>
+    <div class="toolbarSpacer"></div>
+    <button class="btn small" id="vAlways" title="开了之后每条回复都会变成语音条">全语音模式：关</button>
+    <button class="btn small" id="vStart">启动语音服务</button>
+    <button class="btn small" id="vRestart">重启服务</button>
+    <button class="btn small" id="vRefresh">刷新</button>
+  </div>
+
+  <div id="vMissing" class="issueBar hasErr" hidden></div>
+  <div id="vNote" class="issueBar" hidden></div>
+
+  <div class="cards" id="vCards"></div>
+
+  <div class="twoCol">
+    <div class="card">
+      <h3>试听 <span class="muted" id="vCurrent"></span></h3>
+      <textarea id="vText" rows="3" placeholder="打一句话，点下面按钮合成听听像不像。第一句要等 5~8 秒（模型预热）。"></textarea>
+      <div class="vRow">
+        <label class="chk">情绪
+          <select id="vEmotion"><option value="">（用默认）</option></select>
+        </label>
+        <label class="chk">参考音频
+          <select id="vRef"><option value="">（按情绪自动选）</option></select>
+        </label>
+        <label class="chk">语速
+          <input type="range" id="vSpeed" min="0.6" max="1.5" step="0.05" value="1" style="width:100px">
+          <span class="muted" id="vSpeedVal">1.00</span>
+        </label>
+        <div class="toolbarSpacer"></div>
+        <button class="btn primary small" id="vPreview">合成试听</button>
+      </div>
+      <audio id="vPlayer" controls preload="none"></audio>
+      <div class="muted" id="vPreviewMeta" style="margin-top:6px"></div>
+    </div>
+
+    <div class="card">
+      <h3>快速克隆 <span class="muted">（零样本，不用训练）</span></h3>
+      <p class="muted" style="margin-top:0">
+        传一段 3~10 秒的干净人声，再写上这段音频里说的原话（要逐字一致），
+        保存后立刻能用这个音色说话。
+      </p>
+      <div class="vRow">
+        <input type="file" id="vFile" accept=".wav,audio/wav,audio/x-wav">
+        <span class="muted" id="vFileInfo">支持 wav，最大 20 MB</span>
+      </div>
+      <div class="vRow">
+        <input type="text" id="vName" placeholder="音色名（如 胡桃、旁白男声）">
+        <input type="text" id="vPrompt" placeholder="这段音频里说的原话（逐字一致，别少字）">
+      </div>
+      <div class="vRow">
+        <select id="vBind"><option value="">不绑定情绪</option></select>
+        <div class="toolbarSpacer"></div>
+        <button class="btn primary small" id="vUpload">上传并启用</button>
+      </div>
+      <p class="muted" style="margin-bottom:0">
+        B 站素材先用 UVR5 去掉背景音乐。带 BGM 的参考音频会明显掉相似度，还会把音乐一起学进去。
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>音色权重 <span class="muted" id="vWeightCount"></span></h3>
+    <p class="muted" style="margin-top:0">
+      这里是微调（训练）出来的权重：GPT 那半决定「怎么说话」，SoVITS 那半决定「像谁」。
+      点「切换」会立刻热加载，不用重启服务。
+    </p>
+    <table class="tbl" id="vWeights"><tbody><tr><td class="muted">—</td></tr></tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>参考音频 / 情绪库 <span class="muted" id="vRefCount"></span></h3>
+    <p class="muted" style="margin-top:0">
+      GPT-SoVITS 没有「语气指令」——说什么情绪，全看你给它听的是哪段参考音频。
+      所以把不同情绪的片段绑上名字，聊天时按情绪挑就行。
+    </p>
+    <div id="vRefs"></div>
+  </div>
+</section>
+
+</main>
+
+<!-- ══════════════ 弹窗 ══════════════ -->
+<div class="modal" id="modal" hidden>
+  <div class="modalBox">
+    <div class="modalHead">
+      <h3 id="modalTitle">标题</h3>
+      <button class="btn icon" id="modalClose">✕</button>
+    </div>
+    <div class="modalBody" id="modalBody"></div>
+    <div class="modalFoot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>

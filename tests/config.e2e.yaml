@@ -1,0 +1,72 @@
+# 端到端测试专用配置：把一切随机和延迟压掉，让 mock 对话可复现。
+#   python main.py --config tests/config.e2e.yaml
+#   python tools/mock_napcat.py --script tests/chat_script.txt
+
+llm:
+  api_key: ""
+  model: "deepseek-flash"
+  thinking: false
+  max_tokens: 200
+  mock: true
+
+context:
+  history_tokens: 1500
+
+budget:
+  daily_yuan: 2.0
+  min_interval_seconds: 0
+
+humanize:
+  read_delay_min: 0.3
+  read_delay_max: 0.6
+  typing_per_char_min: 0.05
+  typing_per_char_max: 0.09
+  typing_min: 0.6
+  typing_max: 3.0
+  segment_gap_min: 0.4
+  segment_gap_max: 0.8
+  debounce_seconds: 1.0
+  late_reply_chance: 0          # 关掉随机晚回，否则测试会随机挂 20 分钟
+  trivial_replies:
+    - ['^(在|在吗|在不在|在么)[？?！!。.]*$', "在"]
+
+# 端到端测试要把作息和主动搭话关掉：否则跑在半夜它会挂成延迟任务，
+# 而随机时间点跑测试会让「一条消息配一条回复」这个断言随机失败。
+life:
+  enabled: false
+  proactive:
+    enabled: false
+
+# 记忆开着（P3 要验），抽得比默认勤一点，好让几条消息就触发一次。
+memory:
+  enabled: true
+  extract_every_turns: 4
+  extract_min_turns: 3
+  top_k: 3
+  min_sim: 0.2
+
+persona:
+  file: "persona/default.md"
+  name: "遥遥"
+
+whitelist:
+  private: []                   # 空 = 第一个私聊的人自动进白名单（P2 的开箱即用）
+  groups: []
+  group_reply_rate: 0.0
+  auto_accept_first: 1
+
+database:
+  path: "data/e2e.db"
+logging:
+  level: "INFO"
+  file: "data/e2e.log"
+
+pricing:
+  currency_per_million:
+    deepseek-flash:
+      cache_hit:  { peak: 0.04, offpeak: 0.02 }
+      cache_miss: { peak: 2.0,  offpeak: 1.0 }
+      output:     { peak: 8.0,  offpeak: 4.0 }
+  peak_weekdays: [0, 1, 2, 3, 4]
+  peak_ranges: [[9, 12], [14, 18]]
+  holidays: []

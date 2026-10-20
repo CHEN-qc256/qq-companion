@@ -1,0 +1,16 @@
+# 你的配置里有 API Key，别提交
+config.yaml
+config.yaml.bak
+
+# 聊天记录和长期记忆都在这里，属于隐私
+data/
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 临时文档与日志
+*.docx
+~$*
+*.log
